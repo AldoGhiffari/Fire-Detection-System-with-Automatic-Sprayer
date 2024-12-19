@@ -1,0 +1,85 @@
+#define BLYNK_TEMPLATE_ID "TMPL6i01fbrzX"
+#define BLYNK_TEMPLATE_NAME "Fire Detection System with Automatic Sprayer"
+#define BLYNK_AUTH_TOKEN "hlUvhgE6XEbTKIEowBOHNcmjncRfD86y"
+
+#include <WiFi.h>
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <DHT.h>
+#include <ESP32Servo.h>
+
+
+// Blynk Credentials
+char ssid[] = "Wokwi-GUEST";
+char pass[] = "";
+
+BlynkTimer timer;
+
+// Pin Definitions
+#define FLAME_SENSOR_PIN 33
+#define DHT_PIN 32
+#define BUZZER_PIN 25
+#define LED_PIN 26
+#define SERVO_PIN 27
+#define DHTTYPE DHT22
+
+DHT dht(DHT_PIN, DHTTYPE);
+Servo servo;
+
+// Variables
+int flameState = 0;
+
+// Flame Sensor Data
+void sendFlameData() {
+  flameState = digitalRead(FLAME_SENSOR_PIN);
+  Blynk.virtualWrite(V0, flameState);
+  
+  if (flameState == 1) { // Flame Detected
+    digitalWrite(LED_PIN, HIGH);
+    digitalWrite(BUZZER_PIN, HIGH);
+    Blynk.virtualWrite(V5, 1); // LED Indicator ON
+    Blynk.virtualWrite(V4, 1); // Buzzer ON
+  } else {
+    digitalWrite(LED_PIN, LOW);
+    digitalWrite(BUZZER_PIN, LOW);
+    Blynk.virtualWrite(V5, 0); // LED Indicator OFF
+    Blynk.virtualWrite(V4, 0); // Buzzer OFF
+  }
+}
+
+// DHT22 Data
+void sendDHTData() {
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+
+  if (!isnan(temperature) && !isnan(humidity)) {
+    Blynk.virtualWrite(V1, temperature); // Send Temperature
+    Blynk.virtualWrite(V2, humidity);    // Send Humidity
+  }
+}
+
+// Servo Control
+BLYNK_WRITE(V3) {
+  int position = param.asInt();
+  servo.write(position);
+}
+
+void setup() {
+  Serial.begin(115200);
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  pinMode(FLAME_SENSOR_PIN, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  dht.begin();
+  servo.attach(SERVO_PIN);
+
+  // Timers for sending data
+  timer.setInterval(1000L, sendFlameData); // Flame Sensor every 1 sec
+  timer.setInterval(2000L, sendDHTData);   // DHT Data every 2 sec
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
